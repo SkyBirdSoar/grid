@@ -3,81 +3,81 @@
 module Canvas
 ( module Tile
 , module Unit
-, fill
+, Canvas
+, mkCanvas
 ) where
 
-import Tile
-import CheckedGrid (CheckedGrid)
-import Grid        (Grid)
-import Unit
-import qualified CheckedGrid
-import qualified Grid
+import           Tile
+import           Unit
 
-import Data.List
-import System.Random
+import           Control.Monad
 import qualified Data.IntMap.Strict as Map
-import Debug.Trace
+import           Data.List
+import           System.Random
 
-data Canvas = Canvas [((Unit, Unit), Tile)]
-              deriving (Eq)
-
-fill :: [TileSpec] -> [LetterSpec] -> Char -> Unit -> Unit -> StdGen -> Either String (Maybe Canvas)
-fill ts ls defaultL height width stdgen 
+data Canvas = Canvas TileFactory LetterFactory Char Int Int StdGen
+              
+mkCanvas :: [TileSpec] -> [LetterSpec] -> Char -> Unit -> Unit -> StdGen -> Either String Canvas
+mkCanvas ts ls defaultL height width stdgen 
   = case mkTileFac ts of
       Left  s  -> Left s
       Right tf -> case mkLetterFac ls of
                     Left  s  -> Left s
-                    Right lf -> Right $ _fill tf lf defaultL width height stdgen -- This wrapper exists to flip these two values as there is currently a bug
-                    
-_fill :: TileFactory -> LetterFactory -> Char -> Unit -> Unit -> StdGen -> Maybe Canvas
-_fill tf lf defaultL height width stdgen
-  = let res = go stdgen (Grid.fromList []) (CheckedGrid.toList checkedgrid) []
-    in  fmap Canvas (fmap reverse res)
-    
-    where
-      checkedgrid = CheckedGrid.createCheckedGrid height width
-      
-      placeable :: [(Unit, Unit)] -> Grid -> Bool
-      placeable cs used = (not $ any (`Grid.elem` used) cs) && all (`CheckedGrid.elem` checkedgrid) cs
-      
-      maxCount = let (Unit h) = height
-                     (Unit w) = width
-                 in  fromIntegral (h * w)
-      
-      go :: StdGen -> Grid -> [(Unit, Unit)] -> [((Unit, Unit), Tile)] -> Maybe [((Unit, Unit), Tile)]
-      go _   _     []     result  = Just result
-      go gen !used (x:xs) !result
-        | x `Grid.elem` used = go gen used xs result
-        | otherwise          = let (g, gg) = split gen
-                                   res     = try g 0
-                               in  res >>= \(t,tC) -> go gg (Grid.insertMany tC used) xs ((x,t):result)
-        where
-          try :: StdGen -> Int -> Maybe (Tile, [(Unit, Unit)])
-          try g count
-            | count >= maxCount = Nothing
-            | otherwise         = let t  = getTile defaultL tf lf g
-                                      tC = tileCoords x t
-                                  in  if   placeable tC used
-                                      then Just (t, tC)
-                                      else try (fst $ split g) (count + 1)
- 
-tileCoords :: (Unit, Unit) -> Tile -> [(Unit, Unit)]
-tileCoords (x, y) t = [ (x + z, y + z2) | z <- [0..(getSize t) - 1], z2 <- [0..(getSize t) - 1] ]
-      
+                    Right lf -> Right $ Canvas tf lf defaultL (unpack height) (unpack width) stdgen
+
+{-# INLINE unpack #-}
+unpack :: Unit -> Int
+unpack (Unit s) = fromInteger s
+
+tileCoords :: (Int, Int) -> Tile -> [(Int, Int)]
+tileCoords (x, y) t = [ (x + z, y + z2) | z <- [0..(unpack $ getSize t) - 1], z2 <- [0..(unpack $ getSize t) - 1] ]
+
+type MyMap = Map.IntMap (Map.IntMap (Maybe Char))
+
 instance Show Canvas where
-  show (Canvas list) = mapToString $ translateToMap list Map.empty
-                       where
-                         translateToMap :: [((Unit, Unit), Tile)] -> Map.IntMap (Map.IntMap Char) -> Map.IntMap (Map.IntMap Char)
-                         translateToMap []         result = result
-                         translateToMap ((c,t):xs) result 
-                           = let tC = tileCoords c t
-                                 ls = map (\(Unit a, Unit b) -> (fromIntegral a, fromIntegral b, getLetter t)) tC
-                             in  translateToMap xs (foldl' ins result ls)
-                             where
-                               ins m (a, b, l) = Map.alter ins2 a m
-                                                 where
-                                                   ins2 Nothing   = Just $ Map.fromList [(b,l)]
-                                                   ins2 (Just m2) = Just $ Map.insert b l m2
-                                                   
-                         mapToString :: Map.IntMap (Map.IntMap Char) -> String
-                         mapToString m = intercalate "\n" $ Map.elems (Map.map (reverse . (Map.foldr (:) "")) m)
+  show (Canvas tf lf defaultL height width stdgen)
+    = mapToString (populateMapWithTiles _m stdgen m)
+      where
+        m :: MyMap
+        m = ymap
+            where
+              ymap = Map.fromList [ (y,    xmap) | y <- [0..height - 1] ]
+              xmap = Map.fromList [ (x, Nothing) | x <- [0..width  - 1] ]
+              
+        _m :: [(Int, Int)]
+        _m = [ (x, y) | x <- [0..width - 1], y <- [0..height - 1] ]
+        
+        {-# INLINE letterExist #-}
+        letterExist :: (Int, Int) -> MyMap -> Bool
+        letterExist (x, y) ymap = case join (Map.lookup y ymap >>= Map.lookup x >>= return) of
+                                    Nothing -> False
+                                    Just _  -> True
+                                                                
+        placeable :: [(Int, Int)] -> MyMap -> Bool
+        placeable xs m = (all withinBounds xs) && (not (any id (map (`letterExist` m) xs)))
+                         where
+                           withinBounds (x, y) = ((y < height) && (x < width))
+        
+        updateMap :: Char -> MyMap -> [(Int, Int)] -> MyMap
+        updateMap l = foldr forY
+                      where
+                        forY (x, y) = Map.adjust forX y
+                                      where
+                                        forX = Map.adjust (const (Just l)) x
+
+        populateMapWithTiles :: [(Int, Int)] -> StdGen -> MyMap -> MyMap
+        populateMapWithTiles []     _   result = result
+        populateMapWithTiles (x:xs) gen result
+          | letterExist x result = populateMapWithTiles xs gen result
+          | otherwise            = let (g, gg) = split gen
+                                       t       = getTile defaultL tf lf gen
+                                       tC      = tileCoords x t
+                                       tL      = getLetter t
+                                   in  if   placeable tC result
+                                       then populateMapWithTiles xs g (updateMap tL result tC)
+                                       else populateMapWithTiles (x:xs) gg result
+                                       
+        mapToString :: MyMap -> String
+        mapToString m = intercalate "\n" $ Map.elems (Map.map ((Map.foldr f "")) m)
+                        where
+                          f (Just l) acc = l : acc

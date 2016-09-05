@@ -7,7 +7,7 @@ module CheckedGrid
 , createCheckedGrid
 ) where
 
-import Grid (Grid, Unit(..), u0)
+import           Grid (Grid, Unit(..), u0)
 import qualified Grid as Grid
 
 import Prelude hiding (elem)

@@ -1,5 +1,7 @@
 module Tile 
-( TileSpec (..)
+( module Unit
+
+, TileSpec (..)
 , chanceTS
 , TileFactory
 , mkTileFac
@@ -17,12 +19,12 @@ module Tile
 , getTile
 ) where
 
-import Data.List
-import System.Random
-
 import Unit
 import           Generator (Generator)
 import qualified Generator
+
+import Data.List
+import System.Random
 
 newtype TileSpec = TileSpec ( Unit  -- Size
                             , Int   -- Spawn Chance (out of 100)
@@ -33,9 +35,11 @@ newtype LetterSpec = LetterSpec ( Char
                                 , Int
                                 ) deriving (Eq, Show)
 
+{-# INLINE chanceTS #-}
 chanceTS :: TileSpec -> Int
 chanceTS (TileSpec (_,c,_)) = c
 
+{-# INLINE chanceLS #-}
 chanceLS :: LetterSpec -> Int
 chanceLS (LetterSpec (_,c)) = c
 
@@ -91,9 +95,11 @@ tileToLetters tile = replicate size (replicate size letter)
                        size = let (Unit x) = getSize tile in fromIntegral x
                        letter = getLetter tile
 
+{-# INLINE getSize #-}
 getSize :: Tile -> Unit
 getSize (Tile s _) = s
 
+{-# INLINE getLetter #-}
 getLetter :: Tile -> Char
 getLetter (Tile _ c) = c
 

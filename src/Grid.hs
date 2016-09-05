@@ -1,8 +1,7 @@
 module Grid
-( Unit (..)
+( module Unit
 , Grid
 , elem
-, u0
 , fromList
 , insert
 , insertMany
@@ -12,6 +11,8 @@ module Grid
 , toList
 , length
 ) where
+
+import Unit
 
 import qualified Data.IntMap.Strict as Map ( IntMap
                                            , fromList
@@ -32,9 +33,8 @@ import qualified Data.IntSet as Set        ( IntSet
                                            , null
                                            , size
                                            )
-import Unit
 
-import Prelude hiding (elem, length)
+import           Prelude hiding (elem, length)
 import qualified Prelude (length)
 
 newtype Grid = Grid (Map.IntMap Set.IntSet)

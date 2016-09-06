@@ -1,0 +1,55 @@
+{ "tiles": 
+    [
+      { "size": 5
+      , "chance": 2
+      , "letterChance": 0.5
+      },
+      
+      { "size": 4
+      , "chance": 10
+      , "letterChance": 0.5
+      },
+      
+      { "size": 3
+      , "chance": 40
+      , "letterChance": 0.5
+      },
+      
+      { "size": 2
+      , "chance": 18
+      , "letterChance": 0.5
+      },
+      
+      { "size": 1
+      , "chance": 25
+      , "letterChance": 1
+      },
+      
+      { "size": 1
+      , "chance": 5
+      , "letterChance": 0
+      }
+    ],
+    
+  "letters":
+    [
+      { "letter": "x"
+      , "chance": 25
+      },
+      
+      { "letter": "?"
+      , "chance": 25
+      },
+      
+      { "letter": "#"
+      , "chance": 25
+      },
+      
+      { "letter": "\""
+      , "chance": 25
+      }
+    ],
+    
+  "defaultLetter": "."
+}
+

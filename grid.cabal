@@ -16,14 +16,12 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Canvas
-                     , Grid
                      , Tile
                      , Generator
-                     , Unit
-                     , CheckedGrid
   build-depends:       base >= 4.7 && < 5
                      , random
                      , containers
+                     , aeson
   default-language:    Haskell2010
 
 executable grid-exe
@@ -34,6 +32,8 @@ executable grid-exe
                      , grid
                      , random
                      , optparse-applicative
+                     , aeson
+                     , bytestring
   default-language:    Haskell2010
 
 test-suite grid-test

@@ -1,51 +1,52 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Canvas
 
-import Options.Applicative
-import System.Random
-import System.Exit
+import           Control.Applicative
+import qualified Data.ByteString.Lazy as B
+import           Data.Aeson
+import           Options.Applicative
+import           System.Random
+import           System.Exit
 
 -------------
 -------------
-_TILE_SPECS = [ TileSpec ((Unit 5),  2, 0.5)
-              , TileSpec ((Unit 4), 10, 0.5)
-              , TileSpec ((Unit 3), 40, 0.6)
-              , TileSpec ((Unit 1), 25,   1)
-              , TileSpec ((Unit 2), 18, 0.5)
-              , TileSpec ((Unit 1),  5, 0.0)
-              ]
-              
-_LETTER_SPECS = [ LetterSpec ('█', 25)
-                , LetterSpec ('▓', 25)
-                , LetterSpec ('▒', 25)
-                , LetterSpec ('░', 25)
-                ]
-                
-_DEFAULT_LETTER = ' '
 
-run :: StdGen -> (Int, Int, Maybe Int) -> Either String Canvas
-run stdgen (height, width, seed) = mkCanvas _TILE_SPECS 
-                                            _LETTER_SPECS
-                                            _DEFAULT_LETTER 
-                                            (fromIntegral height)
-                                            (fromIntegral width)
-                                            (maybe stdgen (mkStdGen . fromIntegral) seed)
+data Config = Config [TileSpec] [LetterSpec] Char
+
+instance FromJSON Config where
+  parseJSON (Object v) =   Config
+                       <$> v .: "tiles"
+                       <*> v .: "letters"
+                       <*> v .: "defaultLetter"
+  parseJSON _          = empty
+
+run :: [TileSpec] -> [LetterSpec] -> Char -> Int -> Int -> StdGen -> Either String Canvas
+run = mkCanvas
 
 main :: IO ()
 main = do stdgen <- getStdGen
-          res <- (execParser desc >>= return . run stdgen)
-          case res of
-             Left s  -> putStrLn s
-             Right c -> putStrLn . show $ c
+          (height, width, seed, configLoc) <- execParser desc
+          config <- B.readFile configLoc
+          case decode config of
+            Nothing -> do Prelude.putStrLn "Configuration file is invalid."
+                          exitFailure
+            Just (Config ts ls dL) -> let res = run ts ls dL height width (maybe stdgen (mkStdGen . fromIntegral) seed)
+                                      in case res of
+                                           Left s  -> do Prelude.putStrLn ("Configuration File is invalid: " ++ s)
+                                                         exitFailure
+                                           Right c -> Prelude.putStrLn . show $ c
+                   
        where
          desc = info (helper <*> opts)
                   (  fullDesc
                   <> progDesc "Generate an ASCII picture"
                   <> header "grid - generate an ASCII picture" )
                   
-         opts :: Parser (Int, Int, Maybe Int)
-         opts = (,,)
+         opts :: Parser (Int, Int, Maybe Int, String)
+         opts = (,,,)
                 <$> option auto
                 (   long "height"
                 <>  short 'H'
@@ -64,3 +65,10 @@ main = do stdgen <- getStdGen
                 <>  metavar "N"
                 <>  help "Set the seed N used to generate the image"
                 ))
+                <*> strOption
+                (   long "config"
+                <>  short 'C'
+                <>  value "./grid_config.json"
+                <>  metavar "FILE"
+                <>  help "Read configuration data from FILE"
+                )

@@ -50,11 +50,6 @@ _extract (FData (_, a)) = a
 
 check :: Int -> FData a -> Bool
 check key (FData ((x,y), _)) = key >= x && key <= y
-
-extract :: Int -> FData a -> Maybe a
-extract key fd
-  | check key fd = Just (_extract fd)
-  | otherwise    = Nothing
                 
 pick :: Generator a -> StdGen -> a
 pick (GSmall100 fds) gen = let key      = fst $ randomR (0, 99) gen

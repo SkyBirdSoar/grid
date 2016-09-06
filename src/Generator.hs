@@ -21,7 +21,7 @@ type Frequency = Int
 
 mkGen :: [(Frequency, a)] -> Either String (Generator a)
 mkGen list
-  | totalFreq == 100 = if   length list <= 70 -- Arbitrarily chosen number
+  | totalFreq == 100 = if   length list <= 70 -- Arbitrarily chosen number (not proven by benchmarks)
                        then Right $ mkGSmall100 list
                        else Right $ mkGLarge100 list
   | otherwise        = Left $ "Error: Generator: Total Frequency (" ++ show totalFreq ++ ") is not 100"
@@ -30,14 +30,11 @@ mkGen list
     
 mkGSmall100 :: [(Frequency, a)] -> Generator a
 mkGSmall100 list
-  = GSmall100 $ go 0 list []
-  where
-    go :: Int -> [(Frequency, a)] -> [FData a] -> [FData a]
-    go _      []             result = result
-    go !index ((freq, a):xs) result 
-      = go nextIndex xs (FData ((index, nextIndex - 1), a):result)
-        where
-          nextIndex = index + freq
+  = GSmall100 . snd $ foldr f (0, []) list
+    where
+      f :: (Frequency, a) -> (Int, [FData a]) -> (Int, [FData a])
+      f (freq, a) (index, result) = let nextIndex = index + freq
+                                    in  (nextIndex, (FData ((index, nextIndex - 1), a)):result)
 
 mkGLarge100 :: [(Frequency, a)] -> Generator a
 mkGLarge100 = GLarge100 . concatMap expand

@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Canvas
 ( module Tile
 , Canvas
@@ -8,7 +6,6 @@ module Canvas
 
 import           Tile
 
-import           Control.Monad
 import qualified Data.IntMap.Strict as Map
 import           Data.List
 import           System.Random
@@ -26,24 +23,21 @@ mkCanvas ts ls defaultL height width stdgen
 tileCoords :: (Int, Int) -> Tile -> [(Int, Int)]
 tileCoords (x, y) t = [ (x + z, y + z2) | z <- [0..getSize t - 1], z2 <- [0..getSize t - 1] ]
 
-type MyMap = Map.IntMap (Map.IntMap (Maybe Char))
+type MyMap = Map.IntMap (Map.IntMap Char)
 
 instance Show Canvas where
   show (Canvas tf lf defaultL height width stdgen)
-    = mapToString (populateMapWithTiles stdgen m _m)
+    = mapToString populateMapWithTiles
       where
         m :: MyMap
-        m = ymap
-            where
-              ymap = Map.fromList [ (y,    xmap) | y <- [0..height - 1] ]
-              xmap = Map.fromList [ (x, Nothing) | x <- [0..width  - 1] ]
+        m = Map.empty
               
         _m :: [(Int, Int)]
-        _m = [ (x, y) | x <- [0..width - 1], y <- [0..height - 1] ]
+        _m = [ (x, y) | y <- [0..height - 1], x <- [0..width - 1] ]
         
         {-# INLINE letterExist #-}
         letterExist :: (Int, Int) -> MyMap -> Bool
-        letterExist (x, y) ymap = case join (Map.lookup y ymap >>= Map.lookup x >>= return) of
+        letterExist (x, y) ymap = case Map.lookup y ymap >>= Map.lookup x of
                                     Nothing -> False
                                     Just _  -> True
         
@@ -56,13 +50,14 @@ instance Show Canvas where
         updateMap :: Char -> MyMap -> [(Int, Int)] -> MyMap
         updateMap l = foldr forY
                       where
-                        forY (x, y) = Map.adjust forX y
+                        forY (x, y) = Map.alter forX y
                                       where
-                                        forX = Map.adjust (const (Just l)) x
-
-        populateMapWithTiles :: StdGen -> MyMap -> [(Int, Int)] -> MyMap
-        populateMapWithTiles gen _result
-          = snd . foldl' f (gen, _result)
+                                        forX (Just xmap) = Just $ Map.insert x l xmap
+                                        forX Nothing     = Just $ Map.singleton x l
+                                
+        populateMapWithTiles :: MyMap
+        populateMapWithTiles
+          = snd $ foldl' f (stdgen, m) _m
             where
               f :: (StdGen, MyMap) -> (Int, Int) -> (StdGen, MyMap)
               f (g, result) x 
@@ -77,7 +72,4 @@ instance Show Canvas where
                            else f (g2, result) x
 
         mapToString :: MyMap -> String
-        mapToString ymap = intercalate "\n" $ map (Map.foldr f "") (Map.elems ymap)
-                           where
-                             f (Just l) acc = l : acc
-                             f Nothing  acc = "[BUG]" ++ acc
+        mapToString ymap = intercalate "\n" $ map (Map.foldr (:) "") (Map.elems ymap)

@@ -109,8 +109,8 @@ getTile :: Char -> TileFactory -> LetterFactory -> StdGen -> Tile
 getTile defaultL (HundredTileFac gTData) (HundredLetterFac gLetter) stdgen
   = let (size, lc) = Generator.pick gTData stdgen
         (g, gg)    = split stdgen
-    in  if   (fst $ random g) <= lc
-        then Tile size (Generator.pick gLetter gg)
-        else Tile size defaultL
+    in  Tile size (if   (fst $ random g) <= lc
+                   then (Generator.pick gLetter gg)
+                   else defaultL)
 
 --------------------------------------------------------------------------------

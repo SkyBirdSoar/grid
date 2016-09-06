@@ -36,7 +36,7 @@ type MyMap = Map.IntMap (Map.IntMap (Maybe Char))
 
 instance Show Canvas where
   show (Canvas tf lf defaultL height width stdgen)
-    = mapToString (populateMapWithTiles _m stdgen m)
+    = mapToString (populateMapWithTiles stdgen m _m)
       where
         m :: MyMap
         m = ymap
@@ -54,7 +54,7 @@ instance Show Canvas where
                                     Just _  -> True
                                                                 
         placeable :: [(Int, Int)] -> MyMap -> Bool
-        placeable xs m = (all withinBounds xs) && (not (any id (map (`letterExist` m) xs)))
+        placeable xs m = all (\x -> withinBounds x && not (x `letterExist` m)) xs
                          where
                            withinBounds (x, y) = ((y < height) && (x < width))
         
@@ -65,6 +65,22 @@ instance Show Canvas where
                                       where
                                         forX = Map.adjust (const (Just l)) x
 
+        populateMapWithTiles :: StdGen -> MyMap -> [(Int, Int)] -> MyMap
+        populateMapWithTiles gen result
+          = snd . foldl' f (gen, result)
+            where
+              f :: (StdGen, MyMap) -> (Int, Int) -> (StdGen, MyMap)
+              f (gen, result) x 
+                = if   letterExist x result
+                  then (gen, result)
+                  else let (g, gg) = split gen
+                           t       = getTile defaultL tf lf gen
+                           tC      = tileCoords x t
+                           tL      = getLetter t
+                       in  if   placeable tC result
+                           then (g,  (updateMap tL result tC))
+                           else f (gg, result) x
+        {-}
         populateMapWithTiles :: [(Int, Int)] -> StdGen -> MyMap -> MyMap
         populateMapWithTiles []     _   result = result
         populateMapWithTiles (x:xs) gen result
@@ -76,8 +92,8 @@ instance Show Canvas where
                                    in  if   placeable tC result
                                        then populateMapWithTiles xs g (updateMap tL result tC)
                                        else populateMapWithTiles (x:xs) gg result
-                                       
+        -}                               
         mapToString :: MyMap -> String
-        mapToString m = intercalate "\n" $ Map.elems (Map.map ((Map.foldr f "")) m)
+        mapToString m = intercalate "\n" $ map (Map.foldr f "") (Map.elems m)
                         where
                           f (Just l) acc = l : acc
